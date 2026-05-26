@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="NIR Fabric Identification System — Factory Floor Live Monitor Dashboard by Circular Seed">
+<title>Factory Floor Monitor — Circular Seed NIR System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════ */
+:root {
+  --bg: #040b0e;
+  --bg2: #081418;
+  --bg3: #0c1e24;
+  --surface: rgba(12, 30, 36, 0.7);
+  --surface-hover: rgba(16, 40, 48, 0.85);
+  --glass: rgba(10, 94, 111, 0.06);
+
+  --teal: #0A5E6F;
+  --teal-mid: #0D7A8F;
+  --teal-dark: #074250;
+  --cyan: #3CBBDC;
+  --orange: #F58220;
+  --green: #8BB83A;
+  --red: #E84C3D;
+
+  --text: #E4F0F3;
+  --text2: #8BB8C4;
+  --text3: #5A8A96;
+  --text4: #2E5A64;
+
+  --border: rgba(60, 187, 220, 0.08);
+  --border2: rgba(60, 187, 220, 0.16);
+
+  --cotton: #8BB83A;
+  --polyester: #3CBBDC;
+  --wool: #F58220;
+  --others: #E84C3D;
+
+  --font: 'Inter', system-ui, sans-serif;
+  --display: 'Outfit', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+  height: 100vh;
+}
+::selection { background: var(--cyan); color: #000; }
+
+/* ═══════════════════════════════════════════
+   AMBIENT
+   ═══════════════════════════════════════════ */
+.ambient {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+}
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0;
+  transition: opacity 1.5s ease, background 1.5s ease;
+}
+.ambient-orb.o1 { width: 600px; height: 600px; top: -100px; left: -100px; }
+.ambient-orb.o2 { width: 500px; height: 500px; bottom: -80px; right: -80px; }
+.ambient-orb.o3 { width: 300px; height: 300px; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+
+/* Ambient reacts to scan result */
+body.result-cotton .ambient-orb { opacity: 0.12; background: var(--cotton); }
+body.result-polyester .ambient-orb { opacity: 0.12; background: var(--polyester); }
+body.result-wool .ambient-orb { opacity: 0.12; background: var(--wool); }
+body.result-others .ambient-orb { opacity: 0.08; background: var(--others); }
+body.idle .ambient-orb { opacity: 0.04; background: var(--cyan); }
+body.scanning .ambient-orb { opacity: 0.08; background: var(--cyan); animation: ambientPulse 2s ease-in-out infinite; }
+@keyframes ambientPulse {
+  0%,100% { opacity: 0.05; }
+  50% { opacity: 0.15; }
+}
+
+.grid-bg {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgba(60,187,220,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60,187,220,0.025) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 10%, transparent 75%);
+}
+
+/* ═══════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════ */
+.app {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+/* ═══════════════════════════════════════════
+   TOP BAR
+   ═══════════════════════════════════════════ */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+  background: rgba(4, 11, 14, 0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+.topbar-left {
+  display: flex; align-items: center; gap: 14px;
+}
+.logo {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--teal), var(--cyan));
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 11px;
+  color: #fff; letter-spacing: -0.5px;
+  box-shadow: 0 0 20px rgba(60,187,220,0.2);
+}
+.brand {
+  font-family: var(--display); font-size: 16px; font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.brand span { color: var(--cyan); }
+.topbar-sep {
+  width: 1px; height: 20px;
+  background: var(--border2);
+  margin: 0 4px;
+}
+.topbar-tag {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text3);
+}
+.topbar-right {
+  display: flex; align-items: center; gap: 20px;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink {
+  0%,100% { opacity:1; } 50% { opacity:0.3; }
+}
+.live-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--green);
+  display: flex; align-items: center; gap: 8px;
+}
+.clock {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  color: var(--text2); letter-spacing: 1px;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTENT
+   ═══════════════════════════════════════════ */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   CENTER — SCAN AREA
+   ═══════════════════════════════════════════ */
+.scan-area {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  position: relative;
+  padding: 40px;
+}
+
+/* Radar ring animation */
+.radar {
+  position: absolute;
+  width: 420px; height: 420px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.radar-ring {
+  position: absolute; inset: 0;
+  border: 1px solid rgba(60,187,220,0.06);
+  border-radius: 50%;
+}
+.radar-ring:nth-child(2) { inset: 40px; border-color: rgba(60,187,220,0.08); }
+.radar-ring:nth-child(3) { inset: 80px; border-color: rgba(60,187,220,0.10); }
+.radar-ring:nth-child(4) { inset: 120px; border-color: rgba(60,187,220,0.05); }
+
+.radar-sweep {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.radar-sweep::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 50%; height: 2px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(60,187,220,0.6), transparent);
+  animation: sweep 2.5s linear infinite;
+}
+body.scanning .radar-sweep { opacity: 1; }
+@keyframes sweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scan pulse rings */
+.scan-pulse {
+  position: absolute;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.scan-pulse-ring {
+  position: absolute; inset: 0;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  opacity: 0;
+}
+body.scanning .scan-pulse-ring {
+  animation: pulseOut 2s ease-out infinite;
+}
+body.scanning .scan-pulse-ring:nth-child(2) { animation-delay: 0.6s; }
+body.scanning .scan-pulse-ring:nth-child(3) { animation-delay: 1.2s; }
+@keyframes pulseOut {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* Result display */
+.result-wrap {
+  position: relative; z-index: 2;
+  text-align: center;
+  display: flex; flex-direction: column;
+  align-items: center;
+}
+
+.result-status {
+  font-family: var(--mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 3px; text-transform: uppercase;
+  padding: 6px 20px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  margin-bottom: 28px;
+  transition: all 0.5s var(--ease);
+  background: rgba(0,0,0,0.3);
+}
+body.scanning .result-status {
+  color: var(--cyan);
+  border-color: rgba(60,187,220,0.3);
+  background: rgba(60,187,220,0.08);
+}
+body[class*="result-"] .result-status {
+  color: var(--green);
+  border-color: rgba(139,184,58,0.3);
+  background: rgba(139,184,58,0.08);
+}
+
+.result-text {
+  font-family: var(--display);
+  font-size: clamp(72px, 12vw, 140px);
+  font-weight: 900;
+  letter-spacing: -4px;
+  line-height: 0.9;
+  text-transform: uppercase;
+  transition: color 0.5s, text-shadow 0.5s, transform 0.5s var(--ease);
+  color: var(--text4);
+}
+.result-text.cotton {
+  color: var(--cotton);
+  text-shadow: 0 0 80px rgba(139,184,58,0.25), 0 0 160px rgba(139,184,58,0.1);
+}
+.result-text.polyester {
+  color: var(--polyester);
+  text-shadow: 0 0 80px rgba(60,187,220,0.25), 0 0 160px rgba(60,187,220,0.1);
+}
+.result-text.wool {
+  color: var(--wool);
+  text-shadow: 0 0 80px rgba(245,130,32,0.25), 0 0 160px rgba(245,130,32,0.1);
+}
+.result-text.others {
+  color: var(--others);
+  text-shadow: 0 0 80px rgba(232,76,61,0.2), 0 0 160px rgba(232,76,61,0.08);
+}
+.result-text.scanning-anim {
+  animation: textGlitch 0.15s linear infinite;
+}
+@keyframes textGlitch {
+  0% { opacity: 1; }
+  25% { opacity: 0.6; letter-spacing: -2px; }
+  50% { opacity: 1; letter-spacing: -6px; }
+  75% { opacity: 0.7; letter-spacing: -4px; }
+  100% { opacity: 1; letter-spacing: -4px; }
+}
+
+.result-sub {
+  font-family: var(--mono); font-size: 12px; font-weight: 400;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: var(--text3);
+  margin-top: 16px;
+  transition: color 0.4s;
+}
+
+/* Scan button */
+.scan-btn {
+  margin-top: 48px;
+  width: 280px;
+  padding: 20px 40px;
+  background: linear-gradient(135deg, var(--teal), var(--teal-mid));
+  color: #fff;
+  font-family: var(--display); font-size: 18px; font-weight: 700;
+  letter-spacing: 4px; text-transform: uppercase;
+  border: 1px solid rgba(60,187,220,0.2);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s var(--ease);
+  box-shadow:
+    0 0 40px rgba(60,187,220,0.15),
+    0 8px 30px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  position: relative; z-index: 2;
+  overflow: hidden;
+}
+.scan-btn::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; right: 0; bottom: 0;
+  width: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  transition: left 0.5s;
+}
+.scan-btn:hover::after { left: 100%; }
+.scan-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 0 60px rgba(60,187,220,0.25),
+    0 12px 40px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  border-color: rgba(60,187,220,0.4);
+}
+.scan-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.scan-btn.scanning {
+  background: var(--bg3);
+  border-color: rgba(60,187,220,0.15);
+  cursor: wait;
+  animation: btnScanPulse 1.5s ease-in-out infinite;
+}
+@keyframes btnScanPulse {
+  0%,100% { box-shadow: 0 0 30px rgba(60,187,220,0.1), 0 8px 30px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 50px rgba(60,187,220,0.25), 0 8px 30px rgba(0,0,0,0.3); }
+}
+.btn-icon { font-size: 22px; transition: all 0.3s; }
+.spinner {
+  display: none;
+  width: 20px; height: 20px;
+  border: 2.5px solid rgba(255,255,255,0.15);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.scan-btn.scanning .spinner { display: block; }
+.scan-btn.scanning .btn-icon { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════
+   RIGHT SIDEBAR
+   ═══════════════════════════════════════════ */
+.sidebar {
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* Sidebar section */
+.sb-section {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.sb-section:last-child { border-bottom: none; flex: 1; display: flex; flex-direction: column; }
+
+.sb-label {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--text4);
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sb-label::before {
+  content: ''; width: 12px; height: 1.5px;
+  background: var(--cyan); border-radius: 1px;
+}
+
+/* Scans counter */
+.counter-row {
+  display: flex; align-items: flex-end; gap: 10px;
+}
+.counter-num {
+  font-family: var(--mono); font-size: 44px; font-weight: 700;
+  line-height: 1; letter-spacing: -2px;
+  color: var(--cyan);
+  transition: transform 0.3s var(--ease);
+}
+.counter-num.bump { transform: scale(1.15); }
+.counter-unit {
+  font-size: 12px; font-weight: 500;
+  color: var(--text3);
+  padding-bottom: 6px;
+}
+
+/* Battery */
+.battery-row {
+  display: flex; align-items: center; gap: 14px;
+}
+.batt-visual {
+  display: flex; align-items: center; gap: 0;
+}
+.batt-body {
+  width: 52px; height: 26px;
+  border: 2px solid var(--text3);
+  border-radius: 4px;
+  padding: 3px;
+  position: relative;
+}
+.batt-cap {
+  width: 5px; height: 12px;
+  background: var(--text3);
+  border-radius: 0 2px 2px 0;
+}
+.batt-fill {
+  height: 100%; border-radius: 1.5px;
+  transition: width 0.6s var(--ease), background 0.4s;
+}
+.batt-fill.high { background: var(--green); }
+.batt-fill.mid { background: var(--orange); }
+.batt-fill.low { background: var(--red); animation: battBlink 1s infinite; }
+@keyframes battBlink { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.batt-info {
+  flex: 1;
+}
+.batt-pct {
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+  letter-spacing: -1px; line-height: 1;
+}
+.batt-label {
+  font-size: 10px; color: var(--text4);
+  letter-spacing: 0.5px; margin-top: 2px;
+}
+
+/* Scan history */
+.history-wrap {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column;
+  gap: 6px;
+  padding-right: 4px;
+}
+.history-wrap::-webkit-scrollbar { width: 3px; }
+.history-wrap::-webkit-scrollbar-track { background: transparent; }
+.history-wrap::-webkit-scrollbar-thumb { background: var(--text4); border-radius: 3px; }
+
+.h-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.015);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.25s;
+  animation: hSlideIn 0.35s var(--ease) both;
+}
+.h-item:hover {
+  background: rgba(255,255,255,0.035);
+  border-color: var(--border2);
+}
+@keyframes hSlideIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.h-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.h-dot.cotton { background: var(--cotton); box-shadow: 0 0 8px rgba(139,184,58,0.5); }
+.h-dot.polyester { background: var(--polyester); box-shadow: 0 0 8px rgba(60,187,220,0.5); }
+.h-dot.wool { background: var(--wool); box-shadow: 0 0 8px rgba(245,130,32,0.5); }
+.h-dot.others { background: var(--others); box-shadow: 0 0 8px rgba(232,76,61,0.4); }
+
+.h-name {
+  flex: 1;
+  font-family: var(--display); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.h-name.cotton { color: var(--cotton); }
+.h-name.polyester { color: var(--polyester); }
+.h-name.wool { color: var(--wool); }
+.h-name.others { color: var(--others); }
+
+.h-time {
+  font-family: var(--mono); font-size: 10px; font-weight: 400;
+  color: var(--text4);
+}
+
+.h-empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: var(--text4);
+}
+.h-empty-icon { font-size: 28px; opacity: 0.3; }
+.h-empty-text { font-size: 11px; letter-spacing: 1px; }
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .sidebar {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 280px;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .sb-section { min-width: 200px; border-bottom: none; border-right: 1px solid var(--border); }
+  .radar { width: 280px; height: 280px; }
+  .result-text { font-size: 56px !important; letter-spacing: -2px !important; }
+  .scan-btn { width: 220px; padding: 16px 30px; font-size: 15px; }
+}
+@media (max-width: 600px) {
+  .topbar { padding: 0 14px; }
+  .topbar-tag { display: none; }
+  .topbar-sep { display: none; }
+  .scan-area { padding: 20px; }
+  .radar { width: 200px; height: 200px; }
+  .result-text { font-size: 40px !important; }
+  .scan-btn { width: 100%; }
+}
+</style>
+</head>
+<body class="idle">
+
+<div class="ambient">
+  <div class="ambient-orb o1"></div>
+  <div class="ambient-orb o2"></div>
+  <div class="ambient-orb o3"></div>
+</div>
+<div class="grid-bg"></div>
+
+<div class="app">
+
+  <!-- ═══ TOP BAR ═══ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo">CS</div>
+      <div class="brand">Circular <span>Seed</span></div>
+      <div class="topbar-sep"></div>
+      <div class="topbar-tag">Factory Floor Monitor</div>
+    </div>
+    <div class="topbar-right">
+      <div class="live-label"><div class="live-dot"></div>LIVE</div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main">
+
+    <!-- Center scan area -->
+    <section class="scan-area">
+      <div class="radar">
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-ring"></div>
+        <div class="radar-sweep"></div>
+      </div>
+      <div class="scan-pulse">
+        <div class="scan-pulse-ring"></div>
+        <div class="scan-pulse-ring"></div>
+        <div class="scan-pulse-ring"></div>
+      </div>
+
+      <div class="result-wrap">
+        <div class="result-status" id="resultStatus">AWAITING SCAN</div>
+        <div class="result-text" id="resultText">READY</div>
+        <div class="result-sub" id="resultSub">Place fabric sample &amp; press scan</div>
+      </div>
+
+      <button class="scan-btn" id="scanBtn" onclick="startScan()">
+        <span class="btn-icon">⎊</span>
+        <div class="spinner"></div>
+        <span id="scanBtnText">SCAN</span>
+      </button>
+    </section>
+
+    <!-- Right sidebar -->
+    <aside class="sidebar">
+
+      <!-- Scans today -->
+      <div class="sb-section">
+        <div class="sb-label">Scans Today</div>
+        <div class="counter-row">
+          <div class="counter-num" id="totalScans">0</div>
+          <div class="counter-unit">samples</div>
+        </div>
+      </div>
+
+      <!-- Battery -->
+      <div class="sb-section">
+        <div class="sb-label">Power</div>
+        <div class="battery-row">
+          <div class="batt-visual">
+            <div class="batt-body">
+              <div class="batt-fill high" id="battFill" style="width:87%"></div>
+            </div>
+            <div class="batt-cap"></div>
+          </div>
+          <div class="batt-info">
+            <div class="batt-pct" id="battPct">87%</div>
+            <div class="batt-label">Battery</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scan history -->
+      <div class="sb-section">
+        <div class="sb-label">Recent Scans</div>
+        <div class="history-wrap" id="historyList">
+          <div class="h-empty">
+            <div class="h-empty-icon">◎</div>
+            <div class="h-empty-text">No scans yet</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+</div>
+
+<!-- ═══════ SCRIPTS ═══════ -->
+<script>
+const LABELS = { cotton:'COTTON', polyester:'POLYESTER', wool:'WOOL', others:'OTHERS' };
+const FIBRES = ['cotton','polyester','wool','others'];
+let history = [];
+let total = 0;
+let scanning = false;
+
+// Clock
+function tick() {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2,'0')).join(':');
+}
+setInterval(tick, 1000); tick();
+
+// Battery sim
+function battSim() {
+  const el = document.getElementById('battPct');
+  const fill = document.getElementById('battFill');
+  let v = parseInt(el.textContent);
+  if (v > 3 && Math.random() > 0.65) v--;
+  el.textContent = v + '%';
+  fill.style.width = v + '%';
+  fill.className = 'batt-fill ' + (v > 50 ? 'high' : v > 20 ? 'mid' : 'low');
+}
+setInterval(battSim, 10000);
+
+// Scan
+function startScan() {
+  if (scanning) return;
+  scanning = true;
+
+  const btn = document.getElementById('scanBtn');
+  const btnTxt = document.getElementById('scanBtnText');
+  const status = document.getElementById('resultStatus');
+  const text = document.getElementById('resultText');
+  const sub = document.getElementById('resultSub');
+
+  // Scanning state
+  document.body.className = 'scanning';
+  btn.classList.add('scanning');
+  btnTxt.textContent = 'SCANNING';
+  status.textContent = 'SCANNING';
+  text.textContent = '• • •';
+  text.className = 'result-text scanning-anim';
+  sub.textContent = 'Analysing NIR spectrum...';
+
+  const dur = 2000 + Math.random() * 3000;
+
+  setTimeout(() => {
+    // Pick fibre
+    const r = Math.random();
+    const fibre = r < 0.35 ? 'cotton' : r < 0.65 ? 'polyester' : r < 0.88 ? 'wool' : 'others';
+
+    // Show result
+    text.textContent = LABELS[fibre];
+    text.className = 'result-text ' + fibre;
+    status.textContent = 'IDENTIFIED';
+    sub.textContent = 'NIR spectral classification complete';
+    document.body.className = 'result-' + fibre;
+
+    // Stats
+    total++;
+    const counter = document.getElementById('totalScans');
+    counter.textContent = total;
+    counter.classList.add('bump');
+    setTimeout(() => counter.classList.remove('bump'), 300);
+
+    // History
+    const now = new Date();
+    const t = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2,'0')).join(':');
+    history.unshift({ fibre, time: t });
+    if (history.length > 10) history.pop();
+    renderHistory();
+
+    // Reset button
+    btn.classList.remove('scanning');
+    btnTxt.textContent = 'SCAN';
+    scanning = false;
+  }, dur);
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!history.length) {
+    el.innerHTML = '<div class="h-empty"><div class="h-empty-icon">◎</div><div class="h-empty-text">No scans yet</div></div>';
+    return;
+  }
+  el.innerHTML = history.map((h, i) =>
+    `<div class="h-item" style="animation-delay:${i*0.04}s">
+      <div class="h-dot ${h.fibre}"></div>
+      <div class="h-name ${h.fibre}">${LABELS[h.fibre]}</div>
+      <div class="h-time">${h.time}</div>
+    </div>`
+  ).join('');
+}
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); startScan(); }
+});
+</script>
+
+<script>
+  const ESP32_IP = "192.168.1.105";  // <-- change to your ESP32 IP from OLED
+  const POLL_MS  = 2000;
+
+  async function fetchESP32Data() {
+    try {
+      const res  = await fetch(`http://${ESP32_IP}/data`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      const data = await res.json();
+      updateBattery(data.percentage, data.voltage);
+      setStatus(true);
+    } catch (err) {
+      setStatus(false);
+    }
+  }
+
+  function updateBattery(pct, voltage) {
+    const fillEl = document.getElementById("batt-fill");
+    const pctEl  = document.getElementById("batt-pct");
+    if (!fillEl || !pctEl) return;
+
+    const color = pct > 40 ? "#22c55e" : pct > 20 ? "#f59e0b" : "#ef4444";
+    fillEl.style.width      = pct + "%";
+    fillEl.style.background = color;
+    pctEl.style.color       = color;
+    pctEl.textContent       = pct + "%";
+  }
+
+  function setStatus(online) {
+    const dot  = document.querySelector(".ffd-status-dot");
+    const text = document.querySelector(".ffd-status-text");
+    if (dot)  dot.style.background = online ? "#22c55e" : "#ef4444";
+    if (text) text.textContent     = online ? "ESP32 Live" : "ESP32 Offline";
+  }
+
+  fetchESP32Data();
+  setInterval(fetchESP32Data, POLL_MS);
+</script>
+</body>
+</html>
